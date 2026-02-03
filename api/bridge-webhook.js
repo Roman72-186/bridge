@@ -36,40 +36,63 @@ export default async function handler(req, res) {
         }
 
         const telegramId = body.telegram_id.toString();
+        const telegramIdInt = parseInt(body.telegram_id);
         const userName = [
             body.user_data?.first_name || '',
             body.user_data?.last_name || ''
         ].filter(Boolean).join(' ') || 'User';
+        const startParam = body.start_param || '';
 
-        console.log('[Bridge] Processing request for telegram_id:', telegramId);
+        console.log('[Bridge] ===== START =====');
+        console.log('[Bridge] telegram_id:', telegramId);
+        console.log('[Bridge] start_param:', startParam);
+        console.log('[Bridge] user_name:', userName);
 
         // Step 1: Create or update contact via Leadteh API
         const createContactPayload = {
             bot_id: parseInt(LEADTEH_BOT_ID),
             messenger: 'telegram',
-            telegram_id: telegramId,
+            telegram_id: telegramIdInt, // as integer
             name: userName,
             telegram_username: body.user_data?.username || ''
         };
 
-        console.log('[Bridge] Creating/updating contact:', createContactPayload);
+        console.log('[Bridge] Step 1: Creating contact...');
+        console.log('[Bridge] Payload:', JSON.stringify(createContactPayload));
 
+        // Try with Authorization: Bearer header
         const createResponse = await fetch('https://app.leadteh.ru/api/v1/createOrUpdateContact', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-Api-Key': LEADTEH_API_KEY
+                'Authorization': `Bearer ${LEADTEH_API_KEY}`
             },
             body: JSON.stringify(createContactPayload)
         });
 
         const createResult = await createResponse.text();
-        console.log('[Bridge] Create contact response:', createResponse.status, createResult);
+        console.log('[Bridge] Create contact status:', createResponse.status);
+        console.log('[Bridge] Create contact response:', createResult);
 
-        if (!createResponse.ok) {
-            console.error('[Bridge] Failed to create contact:', createResult);
-            // Continue anyway - maybe contact already exists
+        let contactCreated = createResponse.ok;
+
+        // If Bearer didn't work, try X-Api-Key
+        if (!createResponse.ok && createResponse.status === 401) {
+            console.log('[Bridge] Trying X-Api-Key header...');
+            const retryResponse = await fetch('https://app.leadteh.ru/api/v1/createOrUpdateContact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Api-Key': LEADTEH_API_KEY
+                },
+                body: JSON.stringify(createContactPayload)
+            });
+            const retryResult = await retryResponse.text();
+            console.log('[Bridge] Retry status:', retryResponse.status);
+            console.log('[Bridge] Retry response:', retryResult);
+            contactCreated = retryResponse.ok;
         }
 
         // Step 2: Send variables via inner_webhook
@@ -77,9 +100,9 @@ export default async function handler(req, res) {
             contact_by: 'telegram_id',
             search: telegramId,
             variables: {
-                start_param: body.start_param || '',
-                utm_source: body.start_param || '',
-                campaign_tag: body.start_param || '',
+                start_param: startParam,
+                utm_source: startParam,
+                campaign_tag: startParam,
                 source: 'telegram_ads_bridge',
                 telegram_user_id: telegramId,
                 telegram_first_name: body.user_data?.first_name || '',
@@ -93,10 +116,8 @@ export default async function handler(req, res) {
             }
         };
 
-        console.log('[Bridge] Sending variables to webhook:', {
-            search: webhookPayload.search,
-            start_param: webhookPayload.variables.start_param
-        });
+        console.log('[Bridge] Step 2: Sending variables...');
+        console.log('[Bridge] Webhook payload:', JSON.stringify(webhookPayload));
 
         const webhookResponse = await fetch(LEADTEH_WEBHOOK_URL, {
             method: 'POST',
@@ -108,22 +129,27 @@ export default async function handler(req, res) {
         });
 
         const webhookResult = await webhookResponse.text();
-        console.log('[Bridge] Webhook response:', webhookResponse.status, webhookResult);
+        console.log('[Bridge] Webhook status:', webhookResponse.status);
+        console.log('[Bridge] Webhook response:', webhookResult);
 
-        // Return success if either step worked
+        console.log('[Bridge] ===== END =====');
+
+        // Return success
         return res.status(200).json({
             success: true,
             message: 'Contact processed',
-            contact_created: createResponse.ok,
+            contact_created: contactCreated,
             variables_sent: webhookResponse.ok,
             details: {
                 create_status: createResponse.status,
-                webhook_status: webhookResponse.status
+                webhook_status: webhookResponse.status,
+                start_param: startParam
             }
         });
 
     } catch (error) {
-        console.error('[Bridge] Error:', error.message);
+        console.error('[Bridge] ERROR:', error.message);
+        console.error('[Bridge] Stack:', error.stack);
         return res.status(500).json({
             success: false,
             error: 'Internal server error',
