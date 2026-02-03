@@ -66,7 +66,6 @@ export default async function handler(req, res) {
         }
 
         const telegramId = body.telegram_id.toString();
-        const telegramIdInt = parseInt(body.telegram_id);
         const startParam = body.start_param || '';
         const userName = [
             body.user_data?.first_name || '',
@@ -82,7 +81,7 @@ export default async function handler(req, res) {
         const createRes = await leadtehApiPost('createOrUpdateContact', {
             bot_id: parseInt(LEADTEH_BOT_ID),
             messenger: 'telegram',
-            telegram_id: telegramIdInt,
+            telegram_id: telegramId,
             name: userName,
             telegram_username: body.user_data?.username || ''
         });
