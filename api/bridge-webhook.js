@@ -126,7 +126,8 @@ export default async function handler(req, res) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_id: telegramId,
+                contact_by: 'telegram_id',
+                search: telegramId,
                 start_param: startParam,
                 source: 'telegram_ads_bridge'
             })
