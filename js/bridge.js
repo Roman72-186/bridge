@@ -105,6 +105,41 @@
     // DATA EXTRACTION
     // ===================================
 
+    function extractStartParam() {
+        // Source 1: tg.initDataUnsafe.start_param (primary for Telegram Mini Apps)
+        const fromInitData = tg?.initDataUnsafe?.start_param || null;
+
+        // Source 2: Parse from raw tg.initData string (key=value pairs separated by \n)
+        let fromRawInitData = null;
+        if (tg?.initData) {
+            const params = new URLSearchParams(tg.initData);
+            fromRawInitData = params.get('start_param') || null;
+        }
+
+        // Source 3: URL query parameters (?start_param=X or ?startapp=X)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromUrl = urlParams.get('start_param') || urlParams.get('startapp') || null;
+
+        // Source 4: URL hash parameters (#start_param=X)
+        let fromHash = null;
+        if (window.location.hash && window.location.hash.includes('start_param')) {
+            const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+            fromHash = hashParams.get('start_param') || null;
+        }
+
+        const result = fromInitData || fromRawInitData || fromUrl || fromHash;
+
+        console.log('[Bridge] start_param sources:', {
+            initDataUnsafe: fromInitData,
+            rawInitData: fromRawInitData,
+            urlQuery: fromUrl,
+            urlHash: fromHash,
+            resolved: result
+        });
+
+        return result;
+    }
+
     function extractBridgeData() {
         if (!tg) {
             console.error('[Bridge] Telegram WebApp not available');
@@ -120,9 +155,8 @@
             console.warn('[Bridge] No telegram_id found in initData');
         }
 
-        // Extract start_param from the startapp URL parameter
-        // This is passed via t.me/bot?startapp=xyz links
-        const startParam = initDataUnsafe.start_param || null;
+        // Extract start_param from all possible sources
+        const startParam = extractStartParam();
 
         // Build the bridge data payload
         const data = {

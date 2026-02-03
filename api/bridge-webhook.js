@@ -96,28 +96,33 @@ export default async function handler(req, res) {
         }
 
         // Step 2: Send variables via inner_webhook
-        const webhookPayload = {
-            contact_by: 'telegram_id',
-            search: telegramId,
-            variables: {
-                start_param: startParam,
-                utm_source: startParam,
-                campaign_tag: startParam,
-                source: 'telegram_ads_bridge',
-                telegram_user_id: telegramId,
-                telegram_first_name: body.user_data?.first_name || '',
-                telegram_last_name: body.user_data?.last_name || '',
-                telegram_username: body.user_data?.username || '',
-                telegram_language: body.user_data?.language_code || '',
-                telegram_is_premium: body.user_data?.is_premium ? 'true' : 'false',
-                telegram_user_name: userName,
-                bridge_timestamp: body.timestamp || new Date().toISOString(),
-                bridge_platform: body.platform || 'unknown'
-            }
+        // Format A: flat structure — variables at top level
+        const webhookPayloadFlat = {
+            telegram_id: telegramId,
+            start_param: startParam,
+            utm_source: startParam,
+            campaign_tag: startParam,
+            source: 'telegram_ads_bridge',
+            telegram_user_id: telegramId,
+            telegram_first_name: body.user_data?.first_name || '',
+            telegram_last_name: body.user_data?.last_name || '',
+            telegram_username: body.user_data?.username || '',
+            telegram_language: body.user_data?.language_code || '',
+            telegram_is_premium: body.user_data?.is_premium ? 'true' : 'false',
+            telegram_user_name: userName,
+            bridge_timestamp: body.timestamp || new Date().toISOString(),
+            bridge_platform: body.platform || 'unknown'
         };
 
-        console.log('[Bridge] Step 2: Sending variables...');
-        console.log('[Bridge] Webhook payload:', JSON.stringify(webhookPayload));
+        // Format B: nested structure with contact_by + variables wrapper
+        const webhookPayloadNested = {
+            contact_by: 'telegram_id',
+            search: telegramId,
+            variables: webhookPayloadFlat
+        };
+
+        console.log('[Bridge] Step 2: Sending variables (flat format)...');
+        console.log('[Bridge] Flat payload:', JSON.stringify(webhookPayloadFlat));
 
         const webhookResponse = await fetch(LEADTEH_WEBHOOK_URL, {
             method: 'POST',
@@ -125,12 +130,29 @@ export default async function handler(req, res) {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-            body: JSON.stringify(webhookPayload)
+            body: JSON.stringify(webhookPayloadFlat)
         });
 
         const webhookResult = await webhookResponse.text();
-        console.log('[Bridge] Webhook status:', webhookResponse.status);
-        console.log('[Bridge] Webhook response:', webhookResult);
+        console.log('[Bridge] Webhook (flat) status:', webhookResponse.status);
+        console.log('[Bridge] Webhook (flat) response:', webhookResult);
+
+        // If flat format failed, try nested format as fallback
+        let webhookNestedResult = null;
+        if (!webhookResponse.ok) {
+            console.log('[Bridge] Trying nested format...');
+            const webhookResponse2 = await fetch(LEADTEH_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(webhookPayloadNested)
+            });
+            webhookNestedResult = await webhookResponse2.text();
+            console.log('[Bridge] Webhook (nested) status:', webhookResponse2.status);
+            console.log('[Bridge] Webhook (nested) response:', webhookNestedResult);
+        }
 
         console.log('[Bridge] ===== END =====');
 
