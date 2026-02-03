@@ -1,9 +1,8 @@
 /**
  * Vercel Serverless Function - Bridge Webhook Proxy
  *
- * 1. Creates/updates contact via createOrUpdateContact (по имени)
- * 2. Sets start_param via setContactVariable (по contact_id из ответа)
- * 3. Triggers inner_webhook (по telegram_id)
+ * 1. createOrUpdateContact — создаёт контакт, возвращает contact_id
+ * 2. inner_webhook — передаёт start_param, Leadteh сохраняет через маппинг переменных
  */
 
 const LEADTEH_API_KEY = process.env.LEADTEH_API_KEY || 'riKRYyE9YFlWSUpC9E7EHigLTl0dyexB5cGxKHYUdzJu6bZrUb30k2vKZoBh';
@@ -48,23 +47,18 @@ export default async function handler(req, res) {
         console.log('[Bridge] ===== START =====');
         console.log('[Bridge] telegram_id:', telegramId);
         console.log('[Bridge] start_param:', startParam);
-        console.log('[Bridge] userName:', userName);
 
-        // ─── Step 1: createOrUpdateContact ──────────────────────────────
-        // Matches contact by name within bot_id
+        // ─── Step 1: createOrUpdateContact ────────────────────────────────
         console.log('[Bridge] Step 1: createOrUpdateContact...');
-
         const createPayload = {
             bot_id: parseInt(LEADTEH_BOT_ID),
             messenger: 'telegram',
             name: userName
         };
-        // Don't send empty optional fields — may cause 500
         if (telegramId) createPayload.telegram_id = telegramId;
         if (username) createPayload.telegram_username = username;
 
         console.log('[Bridge] createPayload:', JSON.stringify(createPayload));
-
         const createRes = await leadtehApiPost('createOrUpdateContact', createPayload);
         const createText = await createRes.text();
         console.log('[Bridge] createOrUpdateContact status:', createRes.status);
@@ -76,40 +70,22 @@ export default async function handler(req, res) {
             contactId = createJson?.data?.id || createJson?.id || null;
             console.log('[Bridge] Parsed contact_id:', contactId);
         } catch (e) {
-            console.log('[Bridge] Failed to parse response as JSON');
+            console.log('[Bridge] Failed to parse response');
         }
 
-        // ─── Step 2: setContactVariable (start_param) ──────────────────
-        let variableSet = false;
-        if (contactId && startParam) {
-            console.log('[Bridge] Step 2: setContactVariable...');
-            const setVarRes = await leadtehApiPost('setContactVariable', {
-                contact_id: contactId,
-                name: 'start_param',
-                value: startParam
-            });
-            const setVarText = await setVarRes.text();
-            console.log('[Bridge] setContactVariable status:', setVarRes.status);
-            console.log('[Bridge] setContactVariable response:', setVarText);
-            variableSet = setVarRes.ok;
-        } else {
-            console.log('[Bridge] Skipping setContactVariable — contactId:', contactId, 'startParam:', startParam);
-        }
-
-        // ─── Step 3: inner_webhook (trigger chatbot flow) ─────────────
-        // Use contact_id if available (from Step 1), otherwise fall back to telegram_id
-        const webhookContactBy = contactId ? 'id' : 'telegram_id';
-        const webhookSearch = contactId ? contactId.toString() : telegramId;
-        console.log('[Bridge] Step 3: inner_webhook (contact_by=' + webhookContactBy + ', search=' + webhookSearch + ')...');
+        // ─── Step 2: inner_webhook (сохраняет start_param через маппинг) ──
+        // contact_by=id если есть contact_id из Step 1, иначе telegram_id
+        const contactBy = contactId ? 'id' : 'telegram_id';
+        const search = contactId ? contactId.toString() : telegramId;
+        console.log('[Bridge] Step 2: inner_webhook (contact_by=' + contactBy + ', search=' + search + ')...');
 
         const webhookRes = await fetch(LEADTEH_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contact_by: webhookContactBy,
-                search: webhookSearch,
-                start_param: startParam,
-                source: 'telegram_ads_bridge'
+                contact_by: contactBy,
+                search: search,
+                start_param: startParam
             })
         });
         const webhookText = await webhookRes.text();
@@ -121,14 +97,12 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             contact_id: contactId,
-            variable_set: variableSet,
-            webhook_triggered: webhookRes.ok,
+            webhook_status: webhookRes.status,
             start_param: startParam
         });
 
     } catch (error) {
         console.error('[Bridge] ERROR:', error.message);
-        console.error('[Bridge] Stack:', error.stack);
         return res.status(500).json({ success: false, error: 'Internal server error', message: error.message });
     }
 }
