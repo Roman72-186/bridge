@@ -307,8 +307,14 @@
 
         try {
             if (tg && typeof tg.openTelegramLink === 'function') {
-                // This opens the bot chat and closes the Mini App
+                // openTelegramLink may not close the mini app on all platforms
+                // So we explicitly close after a short delay
                 tg.openTelegramLink(botLink);
+
+                // Explicitly close mini app after opening the link
+                setTimeout(() => {
+                    closeMiniApp();
+                }, 300);
             } else {
                 // Fallback: just open the link
                 window.location.href = botLink;
