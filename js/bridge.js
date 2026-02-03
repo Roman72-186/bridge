@@ -201,8 +201,9 @@
 
             return {
                 success: false,
+                status: response.status,
                 error: `Server error (${response.status})`,
-                retryable: response.status >= 500
+                retryable: response.status >= 500 // Only retry on 5xx errors
             };
 
         } catch (error) {
@@ -241,7 +242,18 @@
         if (result.success) {
             // Success - show success state briefly, then close
             showState('success');
+            sendDataToBot();
+            setTimeout(() => {
+                closeMiniApp();
+            }, CONFIG.CLOSE_DELAY_MS);
 
+        } else if (result.status === 404) {
+            // 404 = Contact not found in Leadteh (new user who never wrote to bot)
+            // This is expected for new users from ads
+            // Send data to bot via sendData() so bot can capture it
+            console.log('[Bridge] Contact not found (new user). Sending data to bot via sendData()');
+            showState('success');
+            sendDataToBot();
             setTimeout(() => {
                 closeMiniApp();
             }, CONFIG.CLOSE_DELAY_MS);
@@ -260,6 +272,28 @@
                 // Show error to user
                 showError(result.error || 'Connection failed. Please try again.');
             }
+        }
+    }
+
+    function sendDataToBot() {
+        if (!tg || !bridgeData) return;
+
+        // Send start_param and telegram_id to the bot via sendData
+        // Bot will receive this as web_app_data event
+        const dataForBot = {
+            action: 'bridge_attribution',
+            start_param: bridgeData.start_param || '',
+            telegram_id: bridgeData.telegram_id,
+            timestamp: bridgeData.timestamp
+        };
+
+        try {
+            if (typeof tg.sendData === 'function') {
+                tg.sendData(JSON.stringify(dataForBot));
+                console.log('[Bridge] Data sent to bot:', dataForBot);
+            }
+        } catch (e) {
+            console.error('[Bridge] Failed to send data to bot:', e);
         }
     }
 
