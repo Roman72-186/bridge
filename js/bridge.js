@@ -242,9 +242,9 @@
         if (result.success) {
             // Success - contact created/updated and variables sent
             showState('success');
-            console.log('[Bridge] Success! Closing Mini App...');
+            console.log('[Bridge] Success! Redirecting to bot...');
             setTimeout(() => {
-                closeMiniApp();
+                redirectToBotWithStart();
             }, CONFIG.CLOSE_DELAY_MS);
 
         } else {
