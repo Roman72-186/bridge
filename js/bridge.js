@@ -250,12 +250,12 @@
         } else if (result.status === 404) {
             // 404 = Contact not found in Leadteh (new user who never wrote to bot)
             // This is expected for new users from ads
-            // Send data to bot via sendData() so bot can capture it
-            console.log('[Bridge] Contact not found (new user). Sending data to bot via sendData()');
+            // Redirect to bot with ?start= parameter so bot receives the campaign tag
+            console.log('[Bridge] Contact not found (new user). Redirecting to bot with start param.');
             showState('success');
-            sendDataToBot();
+
             setTimeout(() => {
-                closeMiniApp();
+                redirectToBotWithStart();
             }, CONFIG.CLOSE_DELAY_MS);
 
         } else {
@@ -294,6 +294,39 @@
             }
         } catch (e) {
             console.error('[Bridge] Failed to send data to bot:', e);
+        }
+    }
+
+    function redirectToBotWithStart() {
+        // For new users (404), redirect to bot with ?start= parameter
+        // This ensures the bot receives the campaign tag via /start command
+        const botUsername = CONFIG.BOT_USERNAME;
+        const startParam = bridgeData?.start_param || '';
+
+        if (!botUsername) {
+            console.error('[Bridge] BOT_USERNAME not configured!');
+            closeMiniApp();
+            return;
+        }
+
+        // Build the bot link with start parameter
+        const botLink = startParam
+            ? `https://t.me/${botUsername}?start=${encodeURIComponent(startParam)}`
+            : `https://t.me/${botUsername}`;
+
+        console.log('[Bridge] Redirecting to bot:', botLink);
+
+        try {
+            if (tg && typeof tg.openTelegramLink === 'function') {
+                // This opens the bot chat and closes the Mini App
+                tg.openTelegramLink(botLink);
+            } else {
+                // Fallback: just open the link
+                window.location.href = botLink;
+            }
+        } catch (e) {
+            console.error('[Bridge] Failed to redirect to bot:', e);
+            closeMiniApp();
         }
     }
 
