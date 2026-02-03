@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Loading...</title>
+
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/bridge.css">
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- Loading State (Default) -->
+        <div id="loading-state" class="state">
+            <div class="spinner"></div>
+            <p class="status-text">Connecting...</p>
+        </div>
+
+        <!-- Error State (Hidden by default) -->
+        <div id="error-state" class="state hidden">
+            <div class="error-icon">!</div>
+            <p class="error-title">Connection Error</p>
+            <p class="error-message" id="error-message">Unable to connect. Please try again.</p>
+            <button class="retry-btn" id="retry-btn">Retry</button>
+            <button class="close-btn" id="close-btn">Close</button>
+        </div>
+
+        <!-- Success State (Hidden by default) -->
+        <div id="success-state" class="state hidden">
+            <div class="success-icon">&#10003;</div>
+            <p class="status-text">Redirecting to chat...</p>
+        </div>
+    </div>
+
+    <!-- Configuration -->
+    <script>
+        // Configuration - can be overridden via environment variables at build time
+        window.BRIDGE_CONFIG = {
+            // Webhook URL - uses relative path for same-domain or absolute for external
+            WEBHOOK_URL: '/api/bridge-webhook',
+            // Request timeout in milliseconds
+            TIMEOUT_MS: 10000,
+            // Maximum retry attempts
+            MAX_RETRIES: 2,
+            // Delay between retries in ms
+            RETRY_DELAY_MS: 1000,
+            // Auto-close delay after success (ms)
+            CLOSE_DELAY_MS: 500
+        };
+    </script>
+
+    <!-- Bridge Logic -->
+    <script src="js/bridge.js"></script>
+</body>
+</html>
