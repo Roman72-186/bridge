@@ -96,14 +96,18 @@ export default async function handler(req, res) {
             console.log('[Bridge] Skipping setContactVariable — contactId:', contactId, 'startParam:', startParam);
         }
 
-        // ─── Step 3: inner_webhook (trigger chatbot flow by telegram_id) ─
-        console.log('[Bridge] Step 3: inner_webhook...');
+        // ─── Step 3: inner_webhook (trigger chatbot flow) ─────────────
+        // Use contact_id if available (from Step 1), otherwise fall back to telegram_id
+        const webhookContactBy = contactId ? 'id' : 'telegram_id';
+        const webhookSearch = contactId ? contactId.toString() : telegramId;
+        console.log('[Bridge] Step 3: inner_webhook (contact_by=' + webhookContactBy + ', search=' + webhookSearch + ')...');
+
         const webhookRes = await fetch(LEADTEH_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contact_by: 'telegram_id',
-                search: telegramId,
+                contact_by: webhookContactBy,
+                search: webhookSearch,
                 start_param: startParam,
                 source: 'telegram_ads_bridge'
             })
