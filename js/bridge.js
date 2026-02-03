@@ -240,22 +240,11 @@
         const result = await sendToWebhook(bridgeData);
 
         if (result.success) {
-            // Success - show success state briefly, then close
+            // Success - contact created/updated and variables sent
             showState('success');
-            sendDataToBot();
+            console.log('[Bridge] Success! Closing Mini App...');
             setTimeout(() => {
                 closeMiniApp();
-            }, CONFIG.CLOSE_DELAY_MS);
-
-        } else if (result.status === 404) {
-            // 404 = Contact not found in Leadteh (new user who never wrote to bot)
-            // This is expected for new users from ads
-            // Redirect to bot with ?start= parameter so bot receives the campaign tag
-            console.log('[Bridge] Contact not found (new user). Redirecting to bot with start param.');
-            showState('success');
-
-            setTimeout(() => {
-                redirectToBotWithStart();
             }, CONFIG.CLOSE_DELAY_MS);
 
         } else {
