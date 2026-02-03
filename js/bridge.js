@@ -414,6 +414,9 @@
             console.log('[Bridge] Telegram WebApp initialized');
             console.log('[Bridge] Platform:', tg.platform);
             console.log('[Bridge] Version:', tg.version);
+            console.log('[Bridge] initData (raw):', tg.initData);
+            console.log('[Bridge] initDataUnsafe (full):', JSON.stringify(tg.initDataUnsafe));
+            console.log('[Bridge] URL:', window.location.href);
 
             return true;
         } else {
